@@ -265,7 +265,7 @@
     var morseOutput = document.getElementById("morseOutput")
     var bufferOutput = document.getElementById("bufferOutput")
 
-    scion.scxml.urlToModel('./build/morse.txt',function(err,modelFactoryFactory){
+    scion.scxml.urlToModel('./build/morse.scxml',function(err,modelFactoryFactory){
         if(err) throw err;
 
         modelFactoryFactory.prepare(function(err,modelFactory){
