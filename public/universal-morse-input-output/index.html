@@ -4,7 +4,7 @@
   </head>
   <body style="overflow-y:hidden">
 
-    <button id="startMain" onclick="main()">CLICK THIS BUTTON TO START MOUSE KEY EMULATOR</button>
+    <button id="startMain" onclick="main()">CLICK THIS BUTTON TO START MOUSE KEY EMULATOR :-) </button>
 
 <h3>Telegraph Key - press SPACE BAR ! - on your keyboard</h3>
 <dt id="morseKey">
@@ -320,6 +320,9 @@
           interpreter.start();
         })
     });
+
+    const myButton = document.querySelector("#startMain"); // Replace with your button's ID or selector
+    myButton.disabled = true; // Disable the button, run main() only once
 
   }
 
