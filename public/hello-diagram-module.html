@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sprotty + ELK ES Module Hello Diagram</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    #diagram {
+      width: 100%;
+      height: 100vh;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div id="diagram"></div>
+
+  <script type="module">
+    import {
+      SGraph,
+      SNode,
+      SEdge,
+      SLabel
+    } from "https://esm.run/sprotty-protocol";
+
+    import {
+      SGraphView,
+      SNodeView,
+      SEdgeView,
+      SLabelView,
+      SprottyDiagramConfiguration,
+      LocalModelSource,
+      TYPES,
+      ConsoleLogger,
+      LogLevel,
+      configureModelElement,
+      createContainer
+    } from "https://esm.run/sprotty";
+
+    import ELK from "https://esm.run/elkjs/lib/elk.bundled.js";
+
+    // ------------------------------------------------------------
+    // 1) Diagram configuration
+    // ------------------------------------------------------------
+
+    class HelloDiagramConfig extends SprottyDiagramConfiguration {
+      configure(container) {
+        super.configure(container);
+
+        configureModelElement(container, 'graph', SGraph, SGraphView);
+        configureModelElement(container, 'node', SNode, SNodeView);
+        configureModelElement(container, 'edge', SEdge, SEdgeView);
+        configureModelElement(container, 'label', SLabel, SLabelView);
+      }
+    }
+
+    // ------------------------------------------------------------
+    // 2) ELK layout helper
+    // ------------------------------------------------------------
+
+    const elk = new ELK();
+
+    async function applyElkLayout(graph) {
+      const elkGraph = {
+        id: graph.id,
+        layoutOptions: { "elk.algorithm": "layered" },
+        children: graph.children
+          .filter(c => c.type === "node")
+          .map(n => ({
+            id: n.id,
+            width: 80,
+            height: 40
+          })),
+        edges: graph.children
+          .filter(c => c.type === "edge")
+          .map(e => ({
+            id: e.id,
+            sources: [e.sourceId],
+            targets: [e.targetId]
+          }))
+      };
+
+      const result = await elk.layout(elkGraph);
+
+      const pos = {};
+      (result.children || []).forEach(n => {
+        pos[n.id] = { x: n.x, y: n.y };
+      });
+
+      graph.children.forEach(el => {
+        if (el.type === "node" && pos[el.id]) {
+          el.position = pos[el.id];
+          el.size = { width: 80, height: 40 };
+        }
+      });
+
+      return graph;
+    }
+
+    // ------------------------------------------------------------
+    // 3) Model source
+    // ------------------------------------------------------------
+
+    class HelloModelSource extends LocalModelSource {
+      async load() {
+        let graph = {
+          id: "root",
+          type: "graph",
+          children: [
+            {
+              id: "n1",
+              type: "node",
+              labels: [{ id: "l1", type: "label", text: "Hello" }]
+            },
+            {
+              id: "n2",
+              type: "node",
+              labels: [{ id: "l2", type: "label", text: "World" }]
+            },
+            {
+              id: "e1",
+              type: "edge",
+              sourceId: "n1",
+              targetId: "n2"
+            }
+          ]
+        };
+
+        graph = await applyElkLayout(graph);
+        this.setModel(graph);
+      }
+    }
+
+    // ------------------------------------------------------------
+    // 4) Create DI container and bootstrap
+    // ------------------------------------------------------------
+
+    function createHelloContainer(elementId) {
+      const container = createContainer(
+        new Map([
+          [TYPES.ModelSource, { useClass: HelloModelSource }],
+          [TYPES.ILogger, { useClass: ConsoleLogger }],
+          [TYPES.LogLevel, { useValue: LogLevel.info }],
+          [TYPES.IDiagramConfiguration, { useClass: HelloDiagramConfig }]
+        ]),
+        {
+          clientId: "hello-diagram",
+          containerId: elementId
+        }
+      );
+
+      return container;
+    }
+
+    const container = createHelloContainer("diagram");
+    const modelSource = container.get(TYPES.ModelSource);
+    modelSource.load();
+  </script>
+</body>
+</html>
