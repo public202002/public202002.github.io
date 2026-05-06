@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hello Diagram with ELK + Sprotty</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #sprotty {
+      width: 100%;
+      height: 100vh;
+      border: 1px solid #ccc;
+    }
+  </style>
+
+  <!-- Sprotty (UMD build) -->
+  <script src="https://unpkg.com/sprotty@0.13.0/lib/sprotty.js"></script>
+
+  <!-- ELK.js -->
+  <script src="https://unpkg.com/elkjs/lib/elk.bundled.js"></script>
+</head>
+<body>
+  <div id="sprotty"></div>
+
+  <script>
+    // --- Basic Sprotty setup -------------------------------------------------
+
+    const {
+      ContainerModule,
+      TYPES,
+      LocalModelSource,
+      SGraphView,
+      SNodeView,
+      SEdgeView,
+      SLabelView,
+      configureModelElement,
+      SGraph,
+      SNode,
+      SEdge,
+      SLabel,
+      SprottyDiagramConfiguration,
+      createContainer,
+      ConsoleLogger,
+      LogLevel
+    } = window.sprotty;
+
+    // Custom diagram configuration
+    class HelloDiagramConfig extends SprottyDiagramConfiguration {
+      constructor() {
+        super();
+      }
+      // Map element types to views
+      configure(container) {
+        super.configure(container);
+        configureModelElement(container, 'graph', SGraph, SGraphView);
+        configureModelElement(container, 'node', SNode, SNodeView);
+        configureModelElement(container, 'edge', SEdge, SEdgeView);
+        configureModelElement(container, 'label', SLabel, SLabelView);
+      }
+    }
+
+    // --- ELK layout helper ---------------------------------------------------
+
+    const elk = new ELK();
+
+    async function layoutWithElk(graph) {
+      // Convert Sprotty graph to ELK format
+      const elkGraph = {
+        id: graph.id,
+        layoutOptions: {
+          'elk.algorithm': 'layered'
+        },
+        children: graph.children
+          .filter(c => c.type === 'node')
+          .map(n => ({
+            id: n.id,
+            width: 80,
+            height: 40
+          })),
+        edges: graph.children
+          .filter(c => c.type === 'edge')
+          .map(e => ({
+            id: e.id,
+            sources: [e.sourceId],
+            targets: [e.targetId]
+          }))
+      };
+
+      const result = await elk.layout(elkGraph);
+
+      // Apply layout back to Sprotty model
+      const nodePositions = {};
+      (result.children || []).forEach(n => {
+        nodePositions[n.id] = { x: n.x, y: n.y };
+      });
+
+      graph.children.forEach(el => {
+        if (el.type === 'node' && nodePositions[el.id]) {
+          el.position = nodePositions[el.id];
+          el.size = { width: 80, height: 40 };
+        }
+      });
+
+      return graph;
+    }
+
+    // --- Model source --------------------------------------------------------
+
+    class HelloModelSource extends LocalModelSource {
+      async load() {
+        // Simple graph: two nodes and one edge
+        let graph = {
+          id: 'root',
+          type: 'graph',
+          children: [
+            {
+              id: 'n1',
+              type: 'node',
+              labels: [{ id: 'l1', type: 'label', text: 'Hello' }]
+            },
+            {
+              id: 'n2',
+              type: 'node',
+              labels: [{ id: 'l2', type: 'label', text: 'World' }]
+            },
+            {
+              id: 'e1',
+              type: 'edge',
+              sourceId: 'n1',
+              targetId: 'n2'
+            }
+          ]
+        };
+
+        graph = await layoutWithElk(graph);
+        this.setModel(graph);
+      }
+    }
+
+    // --- Container & bootstrap ----------------------------------------------
+
+    function createHelloContainer(elementId) {
+      const helloModule = new ContainerModule(bind => {
+        bind(TYPES.ModelSource).to(HelloModelSource).inSingletonScope();
+        bind(TYPES.ILogger).to(ConsoleLogger).inSingletonScope();
+        bind(TYPES.LogLevel).toConstantValue(LogLevel.info);
+        bind(TYPES.IDiagramConfiguration).to(HelloDiagramConfig).inSingletonScope();
+      });
+
+      const container = createContainer(helloModule, {
+        clientId: 'hello-diagram',
+        containerId: elementId
+      });
+
+      return container;
+    }
+
+    const container = createHelloContainer('sprotty');
+    const modelSource = container.get(TYPES.ModelSource);
+    modelSource.load();
+  </script>
+</body>
+</html>
