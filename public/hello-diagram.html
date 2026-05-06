@@ -2,23 +2,24 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Sprotty + ELK ES Module</title>
+  <title>Sprotty 0.9 + ELK Hello Diagram</title>
   <style>
     html, body { margin: 0; height: 100%; }
     #diagram { width: 100%; height: 100vh; border: 1px solid #ccc; }
   </style>
+
+  <!-- Sprotty 0.9 UMD -->
+  <script src="https://unpkg.com/sprotty@0.9.0/lib/sprotty.js"></script>
+
+  <!-- ELK UMD -->
+  <script src="https://unpkg.com/elkjs/lib/elk.bundled.js"></script>
 </head>
 <body>
   <div id="diagram"></div>
 
-  <script type="module">
-    import ELK from "https://esm.run/elkjs/lib/elk.bundled.js";
-
-    import {
-      SGraph, SNode, SEdge, SLabel
-    } from "https://esm.run/sprotty-protocol";
-
-    import {
+  <script>
+    const {
+      SGraph, SNode, SEdge, SLabel,
       SGraphView, SNodeView, SEdgeView, SLabelView,
       SprottyDiagramConfiguration,
       LocalModelSource,
@@ -27,7 +28,7 @@
       LogLevel,
       configureModelElement,
       createContainer
-    } from "https://esm.run/sprotty";
+    } = window.sprotty;
 
     // ------------------------------------------------------------
     // Diagram configuration
