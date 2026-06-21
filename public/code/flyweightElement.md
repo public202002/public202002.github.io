@@ -292,3 +292,220 @@ Notes and extensions
 • For strict typing, replace any with a generic interface parameter for the model and declare known keys.
 
 This gives you a compact flyweight object model with maximum sugar and zero-cost until a property is actually used.
+
+
+======================================= EXAMPLE ====================================================
+
+Zde je příklad použití custom elementu `lazy-fly-el` s časem:
+
+```html
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lazy Fly Element s časem</title>
+    <style>
+        lazy-fly-el {
+            display: block;
+            padding: 20px;
+            margin: 20px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        
+        lazy-fly-el .host {
+            padding: 10px;
+        }
+        
+        lazy-fly-el h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        
+        lazy-fly-el .time-display {
+            font-size: 2em;
+            font-weight: bold;
+            color: #e74c3c;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        lazy-fly-el button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        lazy-fly-el button:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lazy Fly Element s aktuálním časem</h1>
+    
+    <lazy-fly-el id="timeElement"></lazy-fly-el>
+    
+    <lazy-fly-el id="timeElement2"></lazy-fly-el>
+
+    <script>
+        // Získání reference na elementy
+        const timeEl = document.getElementById('timeElement');
+        const timeEl2 = document.getElementById('timeElement2');
+        
+        // Definice vlastního installeru pro property 'time'
+        // Toto musí být provedeno PŘED prvním přístupem k property
+        timeEl.defineInstaller('time', (el, key, initial) => {
+            // Inicializace hodnoty
+            let currentTime = new Date().toLocaleTimeString();
+            el.model[key] = currentTime; // Toto spustí defaultní flow
+            
+            // Vytvoření intervalu pro aktualizaci času každou sekundu
+            const intervalId = setInterval(() => {
+                const newTime = new Date().toLocaleTimeString();
+                // Přímý přístup přes model spustí změny automaticky
+                el.model[key] = newTime;
+            }, 1000);
+            
+            // Cleanup při odstranění elementu
+            el.addEventListener('disconnectedCallback', () => {
+                clearInterval(intervalId);
+            });
+        });
+        
+        // Přidáme další vlastnosti pro lepší zobrazení
+        timeEl.defineInstaller('title', (el, key, initial) => {
+            el.model[key] = 'Aktuální čas';
+        });
+        
+        timeEl.defineInstaller('format', (el, key, initial) => {
+            el.model[key] = 'cs-CZ';
+        });
+        
+        // PŘÍSTUP K PROPERTIES - zde se vlastnosti instalují na pozadí
+        console.log('Přístup k vlastnosti "time" - instalace probíhá na pozadí');
+        console.log('Aktuální čas:', timeEl.model.time);
+        
+        // Nastavení title
+        timeEl.model.title = 'Aktuální čas v ČR';
+        
+        // Druhý element s jiným nastavením
+        timeEl2.defineInstaller('time', (el, key, initial) => {
+            // Formát s datumem i časem
+            const formatDateTime = () => {
+                const now = new Date();
+                return now.toLocaleString('cs-CZ', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            };
+            
+            el.model[key] = formatDateTime();
+            
+            const intervalId = setInterval(() => {
+                el.model[key] = formatDateTime();
+            }, 1000);
+            
+            el.addEventListener('disconnectedCallback', () => {
+                clearInterval(intervalId);
+            });
+        });
+        
+        timeEl2.defineInstaller('title', (el, key, initial) => {
+            el.model[key] = 'Čas s datem';
+        });
+        
+        // Inicializace druhého elementu
+        console.log('Druhý element s časem:', timeEl2.model.time);
+        timeEl2.model.title = 'Plné datum a čas';
+        
+        // Přidání ovládacích tlačítek
+        document.addEventListener('DOMContentLoaded', () => {
+            // Přidáme tlačítko pro manuální aktualizaci
+            const button = document.createElement('button');
+            button.textContent = 'Aktualizovat čas ručně';
+            button.style.margin = '10px';
+            button.onclick = () => {
+                timeEl.model.time = new Date().toLocaleTimeString();
+                console.log('Čas byl ručně aktualizován na:', timeEl.model.time);
+            };
+            
+            document.body.insertBefore(button, timeEl);
+            
+            // Tlačítko pro přepínání formátu
+            const formatButton = document.createElement('button');
+            formatButton.textContent = 'Přepnout formát času';
+            formatButton.style.margin = '10px';
+            formatButton.onclick = () => {
+                const currentFormat = timeEl.model.format || 'cs-CZ';
+                const newFormat = currentFormat === 'cs-CZ' ? 'en-US' : 'cs-CZ';
+                timeEl.model.format = newFormat;
+                
+                // Aktualizace času s novým formátem
+                const now = new Date();
+                timeEl.model.time = now.toLocaleTimeString(newFormat);
+                console.log(`Formát přepnut na: ${newFormat}`);
+            };
+            
+            document.body.insertBefore(formatButton, timeEl);
+        });
+        
+        // Sledování změn času
+        const unsubscribe = timeEl.onChange('time', (newValue, oldValue) => {
+            console.log(`Čas se změnil: ${oldValue} -> ${newValue}`);
+        });
+        
+        // Sledování změn title
+        timeEl.onChange('title', (newValue, oldValue) => {
+            console.log(`Název se změnil: ${oldValue} -> ${newValue}`);
+        });
+        
+        // Po 10 sekundách odhlásíme sledování (ukázka)
+        setTimeout(() => {
+            console.log('Odhlášení sledování času po 10 sekundách');
+            unsubscribe();
+        }, 10000);
+        
+        // Ukázka, že property se instalují až při prvním použití
+        console.log('Vlastnost "status" zatím není nainstalována');
+        console.log('Přístup k "status" - instalace na pozadí');
+        timeEl.model.status = 'aktivní';
+        console.log('Stav nastaven na:', timeEl.model.status);
+    </script>
+</body>
+</html>
+```
+
+## Vysvětlení klíčových konceptů:
+
+1. **Lazy instalace**: Property `time` se instaluje až při prvním přístupu (`timeEl.model.time`), nikoliv při vytvoření elementu.
+
+2. **Reaktivita**: Změna `time` automaticky spouští rerender elementu díky Proxy a mikrootázkám.
+
+3. **Vlastní installer**: Metoda `defineInstaller` definuje chování pro konkrétní property včetně automatické aktualizace každou sekundu.
+
+4. **Sledování změn**: Pomocí `onChange` lze sledovat změny hodnot a reagovat na ně.
+
+5. **Oddělené instance**: Každý element má vlastní instanci modelu a může mít jiné chování pro stejnou property.
+
+Element automaticky:
+- Aktualizuje zobrazení každou sekundu
+- Umožňuje ruční aktualizaci
+- Podporuje změnu formátu času
+- Uklízí intervaly při odstranění z DOM
+
+
